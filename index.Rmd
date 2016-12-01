@@ -1,0 +1,65 @@
+---
+title: "Prediction Assignment --- Mikhail Ivanov"
+output: 
+  html_document: 
+    keep_md: yes
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(caret)
+set.seed(314)
+```
+
+## Background
+
+Using devices such as Jawbone Up, Nike FuelBand, and Fitbit it is now possible to collect a large amount of data about personal activity relatively inexpensively. These type of devices are part of the quantified self movement – a group of enthusiasts who take measurements about themselves regularly to improve their health, to find patterns in their behavior, or because they are tech geeks. One thing that people regularly do is quantify how much of a particular activity they do, but they rarely quantify how well they do it. In this project, your goal will be to use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants. They were asked to perform barbell lifts correctly and incorrectly in 5 different ways. More information is available from the website here: http://groupware.les.inf.puc-rio.br/har (see the section on the Weight Lifting Exercise Dataset).
+
+##Data
+
+We have training dataset:
+"pml-training.csv" where we found three types of NA's.
+```{r}
+data = read.csv("pml-training.csv", stringsAsFactors = F, 
+                na.strings=c("NA", "#DIV/0!", ""))
+```
+We have 
+```{r}
+dim(data)
+```
+many observations and measurements. As a result we can remove parameters with NA's, also we remove non-measurement observations (names, time, window, etc...) And then divide our data on training and testing sets.
+```{r}
+columns_na = lapply(data, function(x){ sum(is.na(x))})
+inColumns = columns_na == 0
+inColumns[1:7]= FALSE
+inTrain = createDataPartition(y=data$X, p=0.7, list=FALSE)
+training = data[inTrain,inColumns ]
+testing = data[-inTrain,inColumns ]
+```
+## Model
+
+We should use a random forest, and main problem is time. To reduce the time, we will use minimal parameters: preprocess our set by PCA with 1 component, and 2-fold cross-validation. This is first model, and we be able to change it depend on accuracy and spending time.  
+
+```{r, message=FALSE}
+time=Sys.time()
+mod =  train(classe ~.,method="rf", preprocess="pca", pcaComp=1, data=training, 
+              trControl = trainControl(method = "cv", number=2, allowParallel=TRUE))
+```
+Results:
+```{r}
+Sys.time()-time
+confusionMatrix(testing$classe, predict(mod, newdata=testing))
+```
+
+We spend 5 minuts with more then 99% accuracy (Out of sample error <1%). This is enough, and this is our finl model.
+
+## Predictions
+We have 20-rows test data, which we should us for predictions 
+```{r}
+final = read.csv("pml-testing.csv", stringsAsFactors = F, 
+                na.strings=c("NA", "#DIV/0!", ""))
+final = final[inColumns]
+predict(mod, newdata = final)
+```
+
+
